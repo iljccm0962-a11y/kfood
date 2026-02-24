@@ -279,12 +279,12 @@
 
         <div class="control-group">
             <label for="titleInput">앱 타이틀</label>
-            <input id="titleInput" type="text" value="모두 막방">
+            <input id="titleInput" type="text" value="모두 먹방">
         </div>
 
         <div class="control-group">
             <label for="sloganInput">슬로건</label>
-            <input id="sloganInput" type="text" value="join the world's warmest table">
+            <input id="함께 요리해요!" type="text" value="같이 먹어요!">
         </div>
 
         <div class="control-group">
@@ -338,6 +338,8 @@
     </main>
 
     <script>
+        const STORAGE_KEY = 'mealmate-admin-settings-v1';
+
         const titleInput = document.getElementById('titleInput');
         const sloganInput = document.getElementById('sloganInput');
         const heroImageInput = document.getElementById('heroImageInput');
@@ -352,6 +354,36 @@
 
         let heroObjectUrl = '';
         let foodObjectUrl = '';
+
+        const saveSettings = () => {
+            const settings = {
+                title: titleInput.value.trim(),
+                slogan: sloganInput.value.trim(),
+                heroImage: heroImageInput.value.trim(),
+                foodImage: foodImageInput.value.trim(),
+            };
+
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+            } catch (error) {
+                console.warn('설정을 저장하지 못했습니다.', error);
+            }
+        };
+
+        const loadSettings = () => {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+
+                const saved = JSON.parse(raw);
+                if (typeof saved.title === 'string') titleInput.value = saved.title;
+                if (typeof saved.slogan === 'string') sloganInput.value = saved.slogan;
+                if (typeof saved.heroImage === 'string') heroImageInput.value = saved.heroImage;
+                if (typeof saved.foodImage === 'string') foodImageInput.value = saved.foodImage;
+            } catch (error) {
+                console.warn('저장된 설정을 불러오지 못했습니다.', error);
+            }
+        };
 
         const applySettings = () => {
             const heroImage = heroImageInput.value.trim();
@@ -368,6 +400,8 @@
             if (foodImage) {
                 foodWindow.style.backgroundImage = `url('${foodImage}')`;
             }
+
+            saveSettings();
         };
 
         document.getElementById('applyBtn').addEventListener('click', applySettings);
@@ -381,8 +415,13 @@
             }
 
             heroObjectUrl = URL.createObjectURL(file);
-            heroImageInput.value = heroObjectUrl;
-            applySettings();
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                heroImageInput.value = typeof reader.result === 'string' ? reader.result : heroObjectUrl;
+                applySettings();
+            };
+            reader.readAsDataURL(file);
         });
 
         foodImageFile.addEventListener('change', (event) => {
@@ -394,9 +433,17 @@
             }
 
             foodObjectUrl = URL.createObjectURL(file);
-            foodImageInput.value = foodObjectUrl;
-            applySettings();
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                foodImageInput.value = typeof reader.result === 'string' ? reader.result : foodObjectUrl;
+                applySettings();
+            };
+            reader.readAsDataURL(file);
         });
+
+        loadSettings();
+        applySettings();
     </script>
 </body>
 </html>

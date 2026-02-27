@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MealMate Pro - Motion Engine</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/GLTFLoader.js"></script>
+  <style>
+    :root {
+      --primary-color: #ff4757;
+      --bg-color: #f8f9fa;
+      --text-dark: #2f3542;
+      --panel-border: #e9edf3;
+    }
+    body {
+      margin: 0;
+      background: #eef1f5;
+      color: var(--text-dark);
+      font-family: sans-serif;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 430px;
+      height: 100dvh;
+      background: #fff;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .left-panel { height: 42%; border-bottom: 1px solid var(--panel-border); display: flex; flex-direction: column; background: #fff; }
+    #rpm-frame { flex-grow: 1; border: none; }
+
+    .right-panel { flex: 1; position: relative; background: #0f0f0f; }
+    #canvas-container { width: 100%; height: 100%; }
+
+    .meet-controls {
+      position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 12px; background: rgba(255, 255, 255, 0.94);
+      padding: 10px 18px; border-radius: 36px; border: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px); z-index: 100;
+      max-width: calc(100% - 40px);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .btn {
+      width: 40px; height: 40px; border-radius: 50%; background: #f2f4f8;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      border: 1px solid #dfe4ea;
+    }
+    .btn:hover { border-color: var(--primary-color); }
+    .btn.theme { overflow: hidden; padding: 0; }
+    .btn.theme img { width: 100%; height: 100%; object-fit: cover; }
+    .btn.bg-item.active {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(255, 71, 87, 0.2);
+    }
+
+    #webcam {
+      position: absolute; top: 12px; right: 12px; width: 120px;
+      border-radius: 12px; transform: scaleX(-1);
+      border: 2px solid var(--primary-color); z-index: 50; background: #111;
+    }
+
+    #notice {
+      position: absolute; top: 20px; left: 20px;
+      background: rgba(47, 53, 66, 0.86); border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 8px; padding: 8px 12px; font-size: 13px; z-index: 100; color: #fff;
+      display: none;
+    }
+
+    #completeBtn {
+      position: absolute;
+      right: 20px;
+      bottom: 110px;
+      padding: 12px 16px;
+      background: #2f3542;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      z-index: 105;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <section class="left-panel">
+    <iframe id="rpm-frame" src="https://demo.readyplayer.me/avatar?frameApi"></iframe>
+    <div style="padding:15px; background:#fff; border-top:1px solid var(--panel-border);">
+      <button id="applyBtn" style="width:100%; padding:12px; background:var(--primary-color); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:700;">아바타 동기화 적용</button>
+    </div>
+  </section>
+
+  <section class="right-panel" id="right-panel">
+    <div id="notice"></div>
+    <button id="moveRoomBtn">완료하고 방으로 이동</button>
+    <div class="meet-controls">
+      <input id="avatarUrlInput" type="hidden" value="">
+    </div>
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="canvas-container"></div>
+  </section>
+</div>
+
+<script type="module">
+  import { FaceLandmarker, PoseLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+
+  const THREE_NS = window.THREE;
+  let scene;
+  let camera;
+  let renderer;
+  let currentAvatar;
+  let faceLandmarker;
+  let poseLandmarker;
+  let lastVideoTime = -1;
+
+  const bones = {
+    RightUpperArm: null,
+    RightLowerArm: null,
+    LeftUpperArm: null,
+    LeftLowerArm: null,
+    RightHand: null,
+    RightThumb1: null,
+    RightThumb2: null,
+    RightIndexFinger1: null,
+    RightIndexFinger2: null,
+    Neck: null,
+    Head: null,
+    Spine: null,
+  };
+
+  const motionState = {
+    rightUpperZ: 0,
+    rightUpperY: 0,
+    rightLowerZ: 0,
+    leftUpperZ: 0,
+    leftUpperY: 0,
+    leftLowerZ: 0,
+    spineY: 0,
+    spineZ: 0,
+  };
+
+  const SMOOTH_FACTOR = 0.16;
+  const MIRROR_INPUT = true;
+
+  const video = document.getElementById('webcam');
+  const canvasContainer = document.getElementById('canvas-container');
+  const rightPanel = document.getElementById('right-panel');
+  const notice = document.getElementById('notice');
+  const rpmFrame = document.getElementById('rpm-frame');
+
+  let latestAvatarUrl = 'https://models.readyplayer.me/699fab7d2de3dcd983ba0ad9.glb';
+  let hasAvatarFromFrame = false;
+  const ROOM_ENTRY_IMAGE_KEY = 'mealmateRoomEntryImage';
+  const ROOM_AVATAR_URL_KEY = 'mealmateRoomAvatarUrl';
+  const ROOM_ID_KEY = 'mealmateCurrentRoomId';
+  const ROOMS_KEY = 'mealmateRooms';
+  const STORAGE_KEY = 'mealmate-admin-settings-v1';
+  const DEFAULT_ROOM_IMAGES = {
+    modern: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200',
+    cozy: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200',
+    party: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=1200',
+    sunset: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=1200',
+    forest: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200',
+    city: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200',
+  };
+  const avatarUrlInput = document.getElementById('avatarUrlInput');
+
+  avatarUrlInput.value = latestAvatarUrl;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  function showNotice(message) {
+    notice.textContent = message;
+    notice.style.display = 'block';
+  }
+
+  function clearNotice() {
+    notice.textContent = '';
+    notice.style.display = 'none';
+  }
+
+  function normalizeAngle(angle) {
+    let wrapped = angle;
+    while (wrapped > Math.PI) wrapped -= Math.PI * 2;
+    while (wrapped < -Math.PI) wrapped += Math.PI * 2;
+    return wrapped;
+  }
+
+  function getVisibility(landmark) {
+    if (!landmark || typeof landmark.visibility !== 'number') return 1;
+    return clamp(landmark.visibility, 0, 1);
+  }
+
+  function resizeRenderer() {
+    if (!renderer || !camera) return;
+    const width = rightPanel.clientWidth;
+    const height = rightPanel.clientHeight;
+    camera.aspect = width / Math.max(height, 1);
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  }
+
+  function findBone(root, includes) {
+    let found = null;
+    root.traverse((node) => {
+      if (found || !node.isBone || !node.name) return;
+      const lower = node.name.toLowerCase();
+      if (includes.every((word) => lower.includes(word))) {
+        found = node;
+      }
+    });
+    return found;
+  }
+
+  function bindBones(root) {
+    bones.RightUpperArm = findBone(root, ['right', 'upper', 'arm']) || findBone(root, ['right', 'arm']);
+    bones.RightLowerArm = findBone(root, ['right', 'lower', 'arm']) || findBone(root, ['right', 'forearm']);
+    bones.LeftUpperArm = findBone(root, ['left', 'upper', 'arm']) || findBone(root, ['left', 'arm']);
+    bones.LeftLowerArm = findBone(root, ['left', 'lower', 'arm']) || findBone(root, ['left', 'forearm']);
+    bones.Neck = findBone(root, ['neck']);
+    bones.Head = findBone(root, ['head']);
+    bones.Spine = findBone(root, ['spine']) || findBone(root, ['chest']);
+
+    root.traverse((n) => {
+      if (!n.isBone || !n.name) return;
+      if (n.name.includes('RightThumb1')) bones.RightThumb1 = n;
+      if (n.name.includes('RightThumb2')) bones.RightThumb2 = n;
+      if (n.name.includes('RightIndexFinger1')) bones.RightIndexFinger1 = n;
+      if (n.name.includes('RightIndexFinger2')) bones.RightIndexFinger2 = n;
+      if (n.name.includes('RightHand')) bones.RightHand = n;
+    });
+  }
+
+  function distance2D(a, b) {
+    if (!a || !b) return Infinity;
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function applyOkGesture(p) {
+    if (!p) return;
+    if (!bones.RightHand || !bones.RightIndexFinger1 || !bones.RightThumb1) return;
+
+    const rightWrist = p[16];
+    const rightIndex = p[20];
+    const rightPinky = p[18];
+    const rightElbow = p[14];
+
+    let isOkGesture = false;
+    if (rightWrist && rightIndex && rightPinky && rightElbow) {
+      const handScale = Math.max(distance2D(rightWrist, rightElbow), 0.001);
+      const wristToIndex = distance2D(rightWrist, rightIndex) / handScale;
+      const indexToPinky = distance2D(rightIndex, rightPinky) / handScale;
+      isOkGesture = wristToIndex < 0.85 && indexToPinky < 0.9;
+    }
+
+    const thumbTarget = isOkGesture ? 0.5 : 0.1;
+    const index1Target = isOkGesture ? -1.2 : -0.15;
+    const index2Target = isOkGesture ? -1.0 : -0.1;
+
+    bones.RightThumb1.rotation.y = THREE_NS.MathUtils.lerp(bones.RightThumb1.rotation.y, thumbTarget, 0.2);
+    if (bones.RightThumb2) {
+      bones.RightThumb2.rotation.y = THREE_NS.MathUtils.lerp(bones.RightThumb2.rotation.y, thumbTarget * 0.7, 0.2);
+    }
+    bones.RightIndexFinger1.rotation.z = THREE_NS.MathUtils.lerp(bones.RightIndexFinger1.rotation.z, index1Target, 0.2);
+    if (bones.RightIndexFinger2) {
+      bones.RightIndexFinger2.rotation.z = THREE_NS.MathUtils.lerp(bones.RightIndexFinger2.rotation.z, index2Target, 0.2);
+    }
+  }
+
+  function loadAvatar(url) {
+    const loader = new THREE_NS.GLTFLoader();
+    loader.load(
+      url,
+      (gltf) => {
+        clearNotice();
+        if (currentAvatar) scene.remove(currentAvatar);
+        currentAvatar = gltf.scene;
+        currentAvatar.scale.set(0.85, 0.85, 0.85);
+        currentAvatar.position.y = -0.7;
+        scene.add(currentAvatar);
+        bindBones(currentAvatar);
+      },
+      undefined,
+      () => showNotice('아바타를 불러오지 못했습니다. 다시 시도해주세요.')
+    );
+  }
+
+  function applyBlendShapes(faceResult) {
+    if (!currentAvatar || !faceResult?.faceBlendshapes?.[0]) return;
+    const categories = faceResult.faceBlendshapes[0].categories;
+
+    currentAvatar.traverse((node) => {
+      if (!node.isMesh || !node.morphTargetDictionary || !node.morphTargetInfluences) return;
+      categories.forEach((category) => {
+        const index = node.morphTargetDictionary[category.categoryName];
+        if (index === undefined) return;
+        const current = node.morphTargetInfluences[index] || 0;
+        node.morphTargetInfluences[index] = lerp(current, category.score, 0.28);
+      });
+    });
+  }
+
+  function updatePose(poseLandmarks) {
+    if (!poseLandmarks || !currentAvatar) return;
+    const p = poseLandmarks;
+
+    const leftShoulder = p[MIRROR_INPUT ? 12 : 11];
+    const rightShoulder = p[MIRROR_INPUT ? 11 : 12];
+    const leftElbow = p[MIRROR_INPUT ? 14 : 13];
+    const rightElbow = p[MIRROR_INPUT ? 13 : 14];
+    const leftWrist = p[MIRROR_INPUT ? 16 : 15];
+    const rightWrist = p[MIRROR_INPUT ? 15 : 16];
+
+    if (!leftShoulder || !rightShoulder || !leftElbow || !rightElbow) return;
+
+    if (bones.RightUpperArm && bones.RightLowerArm && rightWrist) {
+      const vis = Math.min(getVisibility(rightShoulder), getVisibility(rightElbow), getVisibility(rightWrist));
+      if (vis > 0.2) {
+        const upperAngle = Math.atan2(rightElbow.y - rightShoulder.y, rightElbow.x - rightShoulder.x);
+        const lowerAngle = Math.atan2(rightWrist.y - rightElbow.y, rightWrist.x - rightElbow.x);
+
+        const targetUpperZ = clamp(-upperAngle - Math.PI * 0.5, -2.5, 2.5);
+        const targetLowerZ = clamp(-normalizeAngle(lowerAngle - upperAngle), -2.0, 2.0);
+        const targetUpperY = clamp((rightShoulder.z - rightElbow.z) * 0.85, -0.7, 0.7);
+
+        const upperDelta = Math.abs(normalizeAngle(targetUpperZ - motionState.rightUpperZ));
+        const lowerDelta = Math.abs(normalizeAngle(targetLowerZ - motionState.rightLowerZ));
+        const upperSmooth = clamp(SMOOTH_FACTOR + vis * 0.12 + upperDelta * 0.05, 0.12, 0.42);
+        const lowerSmooth = clamp(SMOOTH_FACTOR + vis * 0.14 + lowerDelta * 0.07, 0.14, 0.46);
+
+        motionState.rightUpperZ = lerp(motionState.rightUpperZ, targetUpperZ, upperSmooth);
+        motionState.rightUpperY = lerp(motionState.rightUpperY, targetUpperY, upperSmooth * 0.85);
+        motionState.rightLowerZ = lerp(motionState.rightLowerZ, targetLowerZ, lowerSmooth);
+
+        bones.RightUpperArm.rotation.z = motionState.rightUpperZ;
+        bones.RightUpperArm.rotation.y = motionState.rightUpperY;
+        bones.RightLowerArm.rotation.z = motionState.rightLowerZ;
+      }
+    }
+
+    if (bones.LeftUpperArm && bones.LeftLowerArm && leftWrist) {
+      const vis = Math.min(getVisibility(leftShoulder), getVisibility(leftElbow), getVisibility(leftWrist));
+      if (vis > 0.2) {
+        const upperAngle = Math.atan2(leftElbow.y - leftShoulder.y, leftElbow.x - leftShoulder.x);
+        const lowerAngle = Math.atan2(leftWrist.y - leftElbow.y, leftWrist.x - leftElbow.x);
+
+        const targetUpperZ = clamp(-upperAngle + Math.PI * 0.5, -2.5, 2.5);
+        const targetLowerZ = clamp(-normalizeAngle(lowerAngle - upperAngle), -2.0, 2.0);
+        const targetUpperY = clamp((leftElbow.z - leftShoulder.z) * 0.85, -0.7, 0.7);
+
+        const upperDelta = Math.abs(normalizeAngle(targetUpperZ - motionState.leftUpperZ));
+        const lowerDelta = Math.abs(normalizeAngle(targetLowerZ - motionState.leftLowerZ));
+        const upperSmooth = clamp(SMOOTH_FACTOR + vis * 0.12 + upperDelta * 0.05, 0.12, 0.42);
+        const lowerSmooth = clamp(SMOOTH_FACTOR + vis * 0.14 + lowerDelta * 0.07, 0.14, 0.46);
+
+        motionState.leftUpperZ = lerp(motionState.leftUpperZ, targetUpperZ, upperSmooth);
+        motionState.leftUpperY = lerp(motionState.leftUpperY, targetUpperY, upperSmooth * 0.85);
+        motionState.leftLowerZ = lerp(motionState.leftLowerZ, targetLowerZ, lowerSmooth);
+
+        bones.LeftUpperArm.rotation.z = motionState.leftUpperZ;
+        bones.LeftUpperArm.rotation.y = motionState.leftUpperY;
+        bones.LeftLowerArm.rotation.z = motionState.leftLowerZ;
+      }
+    }
+
+    if (bones.Head && p[0]) {
+      const targetHeadY = clamp((p[0].x - 0.5) * -0.6, -0.55, 0.55);
+      const targetHeadX = clamp((p[0].y - 0.5) * 0.4, -0.45, 0.45);
+      bones.Head.rotation.y = lerp(bones.Head.rotation.y, targetHeadY, 0.1);
+      bones.Head.rotation.x = lerp(bones.Head.rotation.x, targetHeadX, 0.1);
+    }
+
+    if (bones.Spine) {
+      const bodyTurn = clamp((leftShoulder.z - rightShoulder.z) * 1.7, -0.5, 0.5);
+      const bodyTilt = clamp(Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x) * 0.33, -0.24, 0.24);
+      motionState.spineY = lerp(motionState.spineY, bodyTurn, 0.12);
+      motionState.spineZ = lerp(motionState.spineZ, bodyTilt, 0.1);
+      bones.Spine.rotation.y = motionState.spineY;
+      bones.Spine.rotation.z = motionState.spineZ;
+    }
+  }
+
+  function parseFramePayload(rawData) {
+    if (!rawData) return null;
+    if (typeof rawData === 'string') {
+      if (rawData.startsWith('https://models.readyplayer.me/')) return { avatarUrl: rawData };
+      try {
+        return parseFramePayload(JSON.parse(rawData));
+      } catch {
+        return null;
+      }
+    }
+    if (typeof rawData !== 'object') return null;
+    if (typeof rawData.url === 'string' && rawData.url.startsWith('https://models.readyplayer.me/')) {
+      return { avatarUrl: rawData.url };
+    }
+    if (rawData.data && typeof rawData.data.url === 'string' && rawData.data.url.startsWith('https://models.readyplayer.me/')) {
+      return { avatarUrl: rawData.data.url };
+    }
+    return null;
+  }
+
+  async function init() {
+    if (!THREE_NS || !THREE_NS.GLTFLoader) {
+      showNotice('3D 라이브러리를 불러오지 못했습니다. 새로고침 해주세요.');
+      return;
+    }
+
+    scene = new THREE_NS.Scene();
+    camera = new THREE_NS.PerspectiveCamera(40, 1, 0.1, 1000);
+    camera.position.set(0, 0.8, 3.8);
+
+    renderer = new THREE_NS.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    canvasContainer.appendChild(renderer.domElement);
+
+    scene.add(new THREE_NS.AmbientLight(0xffffff, 1.2));
+    const sun = new THREE_NS.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(2, 2, 2);
+    scene.add(sun);
+
+    resizeRenderer();
+    renderer.domElement.style.filter = 'none';
+    scene.background = new THREE_NS.Color(0x000000);
+
+    const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+
+    faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        delegate: 'GPU',
+      },
+      outputFaceBlendshapes: true,
+      runningMode: 'VIDEO',
+      numFaces: 1,
+    });
+
+    poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+    });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    } catch {
+      showNotice('웹캠 권한이 필요합니다. 카메라 접근을 허용해주세요.');
+    }
+
+    loadAvatar(latestAvatarUrl);
+    animate();
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    if (currentAvatar && video.readyState >= 2 && faceLandmarker && poseLandmarker) {
+      const now = performance.now();
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+
+        const faceRes = faceLandmarker.detectForVideo(video, now);
+        const poseRes = poseLandmarker.detectForVideo(video, now);
+
+        applyBlendShapes(faceRes);
+        if (poseRes.landmarks && poseRes.landmarks[0]) {
+          const p = poseRes.landmarks[0];
+          updatePose(p);
+          applyOkGesture(p);
+        }
+      }
+    }
+
+    if (renderer && scene && camera) {
+      renderer.render(scene, camera);
+    }
+  }
+
+  window.addEventListener('resize', resizeRenderer);
+
+  rpmFrame.addEventListener('load', () => {
+    try {
+      rpmFrame.contentWindow.postMessage(JSON.stringify({
+        target: 'readyplayerme',
+        type: 'subscribe',
+        eventName: 'v1.**',
+      }), '*');
+    } catch {
+      showNotice('아바타 프레임 연결에 실패했습니다.');
+    }
+  });
+
+  window.addEventListener('message', (event) => {
+    const payload = parseFramePayload(event.data);
+    if (!payload || !payload.avatarUrl) return;
+    latestAvatarUrl = payload.avatarUrl;
+    avatarUrlInput.value = payload.avatarUrl;
+    hasAvatarFromFrame = true;
+    showNotice('새 아바타를 받았습니다. 적용 버튼을 눌러 반영하세요.');
+  });
+
+  document.getElementById('applyBtn').addEventListener('click', () => {
+    if (!hasAvatarFromFrame) {
+      showNotice('왼쪽에서 아바타를 완성한 뒤 다시 눌러주세요.');
+      return;
+    }
+    localStorage.setItem(ROOM_AVATAR_URL_KEY, latestAvatarUrl);
+    avatarUrlInput.value = latestAvatarUrl;
+    loadAvatar(latestAvatarUrl);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const previewImage = captureRoomEntryImage();
+        if (previewImage) {
+          localStorage.setItem(ROOM_ENTRY_IMAGE_KEY, previewImage);
+        }
+      });
+    });
+
+    clearNotice();
+  });
+
+  function captureRoomEntryImage() {
+    if (renderer && renderer.domElement) {
+      try {
+        return renderer.domElement.toDataURL('image/png');
+      } catch {
+        // cross-origin texture가 있을 때 캡처 실패 가능
+      }
+    }
+
+    if (video && video.readyState >= 2) {
+      try {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth || 640;
+        tempCanvas.height = video.videoHeight || 360;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+        return tempCanvas.toDataURL('image/png');
+      } catch {
+        return '';
+      }
+    }
+
+    return '';
+  }
+
+  function resolveBackgroundFromCreateRoom() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const roomIdFromQuery = params.get('roomId');
+      const roomIdFromStorage = localStorage.getItem(ROOM_ID_KEY);
+      const targetRoomId = roomIdFromQuery || roomIdFromStorage || '';
+      if (targetRoomId) {
+        localStorage.setItem(ROOM_ID_KEY, targetRoomId);
+      }
+
+      const rawRooms = localStorage.getItem(ROOMS_KEY);
+      const rooms = JSON.parse(rawRooms || '[]');
+      const matchedRoom = Array.isArray(rooms) && rooms.length
+        ? rooms.find((room) => String(room?.id || '') === String(targetRoomId))
+        : null;
+      const fallbackRoom = Array.isArray(rooms) && rooms.length ? rooms[0] : null;
+      const targetRoom = matchedRoom || fallbackRoom;
+      const bgTheme = String(targetRoom?.bgTheme || 'modern');
+
+      let settings = null;
+      try {
+        const settingsRaw = localStorage.getItem(STORAGE_KEY);
+        settings = settingsRaw ? JSON.parse(settingsRaw) : null;
+      } catch {
+        settings = null;
+      }
+
+      if (bgTheme === 'modern' && settings?.createRoomBgModern) return settings.createRoomBgModern;
+      if (bgTheme === 'cozy' && settings?.createRoomBgCozy) return settings.createRoomBgCozy;
+      if (bgTheme === 'party' && settings?.createRoomBgParty) return settings.createRoomBgParty;
+      if (bgTheme === 'sunset' && settings?.createRoomBgSunset) return settings.createRoomBgSunset;
+      if (bgTheme === 'forest' && settings?.createRoomBgForest) return settings.createRoomBgForest;
+      if (bgTheme === 'city' && settings?.createRoomBgCity) return settings.createRoomBgCity;
+
+      return DEFAULT_ROOM_IMAGES[bgTheme] || DEFAULT_ROOM_IMAGES.modern;
+    } catch {
+      return DEFAULT_ROOM_IMAGES.modern;
+    }
+  }
+
+  document.getElementById('moveRoomBtn').onclick = function() {
+    const avatarUrl = document.getElementById('avatarUrlInput').value || latestAvatarUrl;
+    const createRoomBackground = resolveBackgroundFromCreateRoom();
+
+    const avatarData = {
+      url: avatarUrl,
+      bg: createRoomBackground,
+      effect: 'none',
+    };
+
+    if (!avatarData.url) {
+      alert('아바타가 아직 준비되지 않았습니다!');
+      return;
+    }
+
+    localStorage.setItem('mealMate_current', JSON.stringify(avatarData));
+
+    const mealMateSettings = {
+      avatarUrl: avatarData.url,
+      backgroundUrl: avatarData.bg,
+      lastUpdated: Date.now(),
+    };
+    localStorage.setItem('mealMateSettings', JSON.stringify(mealMateSettings));
+
+    const previewImage = captureRoomEntryImage();
+    if (previewImage) {
+      localStorage.setItem(ROOM_ENTRY_IMAGE_KEY, previewImage);
+    }
+    localStorage.setItem(ROOM_AVATAR_URL_KEY, avatarData.url);
+    window.location.href = 'room.html';
+  };
+
+  init().catch(() => {
+    showNotice('초기화 중 오류가 발생했습니다. 새로고침 후 다시 시도해주세요.');
+  });
+</script>
+</body>
+</html>

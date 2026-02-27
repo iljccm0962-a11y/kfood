@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MealMate - 새로운 식사 모임</title>
+    <style>
+        :root {
+            --primary-color: #ff4757;
+            --bg-color: #f8f9fa;
+            --text-dark: #2f3542;
+            --text-gray: #a4b0be;
+        }
+
+        * { box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        body { margin: 0; background-color: #eef1f5; display: flex; justify-content: center; min-height: 100vh; }
+
+        .phone-container {
+            width: 100%; max-width: 450px; background: #fff;
+            min-height: 100dvh; display: flex; flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.12); position: relative;
+        }
+
+        .header { padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f1f1; }
+        .header h2 { margin: 0; font-size: 1.2rem; color: var(--text-dark); }
+        .back-btn { cursor: pointer; font-size: 1.5rem; color: var(--text-gray); border: none; background: none; }
+
+        .content { padding: 25px; flex: 1; overflow-y: auto; }
+        .form-group { margin-bottom: 25px; }
+        label { display: block; font-size: 0.95rem; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; }
+
+        .input-field { width: 100%; padding: 14px 18px; border: 1.5px solid #eee; border-radius: 14px; font-size: 1rem; outline: none; transition: 0.2s; }
+        .input-field:focus { border-color: var(--primary-color); }
+
+        /* 배경 선택 스타일 */
+        .bg-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .bg-option { 
+            height: 60px; border-radius: 10px; cursor: pointer; border: 3px solid transparent;
+            background-size: cover; background-position: center; transition: 0.2s;
+        }
+        .bg-option.active { border-color: var(--primary-color); transform: scale(1.05); }
+
+        /* 음악 선택 스타일 (칩 형태) */
+        .music-wrapper { display: flex; gap: 8px; flex-wrap: wrap; }
+        .music-chip {
+            padding: 10px 15px; border-radius: 12px; background: #f1f2f6;
+            font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 5px;
+        }
+        .music-chip.active { background: #2f3542; color: #fff; }
+
+        .music-preview-status {
+            margin-top: 10px;
+            display: block;
+            font-size: 0.78rem;
+            color: #57606f;
+        }
+
+        /* 하단 버튼 */
+        .footer { padding: 20px; border-top: 1px solid #f1f1f1; }
+        .submit-btn {
+            width: 100%; padding: 18px; background: var(--primary-color);
+            color: #fff; border: none; border-radius: 16px; font-size: 1.1rem; font-weight: bold; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone-container">
+    <header class="header">
+        <button class="back-btn" onclick="history.back()">✕</button>
+        <h2 id="createRoomPageTitle">방 만들기 & 설정</h2>
+        <div style="width: 24px;"></div>
+    </header>
+
+    <main class="content">
+        <div class="form-group">
+            <label>모임 제목</label>
+            <input type="text" id="roomTitle" class="input-field" placeholder="방 제목을 입력하세요">
+        </div>
+
+        <div class="form-group">
+            <label>방 배경 테마</label>
+            <div class="bg-selector" id="bgGroup">
+                <div class="bg-option active" id="bgOptionModern" style="background-image: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200');" data-bg="modern"></div>
+                <div class="bg-option" id="bgOptionCozy" style="background-image: url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200');" data-bg="cozy"></div>
+                <div class="bg-option" id="bgOptionParty" style="background-image: url('https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=200');" data-bg="party"></div>
+                <div class="bg-option" id="bgOptionSunset" style="background-image: url('https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=200');" data-bg="sunset"></div>
+                <div class="bg-option" id="bgOptionForest" style="background-image: url('https://images.unsplash.com/photo-1448375240586-882707db888b?w=200');" data-bg="forest"></div>
+                <div class="bg-option" id="bgOptionCity" style="background-image: url('https://images.unsplash.com/photo-1514565131-fce0801e5785?w=200');" data-bg="city"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>배경 음악(분위기)</label>
+            <div class="music-wrapper" id="musicGroup">
+                <div class="music-chip active" data-music-key="jazz">🎵 잔잔한 재즈</div>
+                <div class="music-chip" data-music-key="pop">🎵 신나는 팝</div>
+                <div class="music-chip" data-music-key="acoustic">🎵 어쿠스틱</div>
+                <div class="music-chip" data-music-key="quiet">🎵 조용한 식사</div>
+            </div>
+            <span class="music-preview-status" id="musicPreviewStatus">음악 칩을 클릭하면 재생됩니다.</span>
+        </div>
+
+        <div class="form-group">
+            <label>참여 인원</label>
+            <input type="number" id="peopleCount" class="input-field" value="2" min="2" max="8">
+        </div>
+    </main>
+
+    <footer class="footer">
+        <button class="submit-btn" id="createRoomSubmitBtn" onclick="createRoom()">설정 완료 및 개설</button>
+    </footer>
+</div>
+
+<script>
+    const STORAGE_KEY = 'mealmate-admin-settings-v1';
+    const ASSET_DB_NAME = 'mealmate-assets-db';
+    const ASSET_STORE_NAME = 'assets';
+    let selectedBg = "modern";
+    let selectedMusic = "잔잔한 재즈";
+    let selectedMusicKey = 'jazz';
+    let musicPreviewAudio = null;
+    let isMusicPlaying = false;
+    const musicTrackMap = {
+        jazz: '',
+        pop: '',
+        acoustic: '',
+        quiet: '',
+    };
+
+    const musicPreviewStatus = document.getElementById('musicPreviewStatus');
+
+    const openAssetDb = () => new Promise((resolve, reject) => {
+        const request = indexedDB.open(ASSET_DB_NAME, 1);
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(ASSET_STORE_NAME)) {
+                db.createObjectStore(ASSET_STORE_NAME);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+
+    const loadAssetBlob = async (key) => {
+        const db = await openAssetDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(ASSET_STORE_NAME, 'readonly');
+            const request = tx.objectStore(ASSET_STORE_NAME).get(key);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    };
+
+    const resolveTrackUrl = async (trackRef) => {
+        if (!trackRef) return '';
+        if (!trackRef.startsWith('idb://')) return trackRef;
+
+        const key = trackRef.replace('idb://', '').trim();
+        if (!key) return '';
+
+        const blob = await loadAssetBlob(key);
+        if (!blob) return '';
+        return URL.createObjectURL(blob);
+    };
+
+    function stopMusicPreview() {
+        if (!musicPreviewAudio) return;
+        musicPreviewAudio.pause();
+        musicPreviewAudio.currentTime = 0;
+        musicPreviewAudio = null;
+        isMusicPlaying = false;
+    }
+
+    async function playSelectedMusicPreview() {
+        const trackRef = musicTrackMap[selectedMusicKey];
+        if (!trackRef) {
+            musicPreviewStatus.textContent = '업로드된 트랙이 없습니다.';
+            return;
+        }
+
+        try {
+            const trackUrl = await resolveTrackUrl(trackRef);
+            if (!trackUrl) {
+                musicPreviewStatus.textContent = '업로드된 트랙이 없습니다.';
+                return;
+            }
+
+            stopMusicPreview();
+            musicPreviewAudio = new Audio(trackUrl);
+            musicPreviewAudio.addEventListener('ended', () => {
+                isMusicPlaying = false;
+                musicPreviewStatus.textContent = '재생 완료';
+            });
+            musicPreviewAudio.play().then(() => {
+                isMusicPlaying = true;
+                musicPreviewStatus.textContent = `${selectedMusic} 재생 중`;
+            }).catch(() => {
+                isMusicPlaying = false;
+                musicPreviewStatus.textContent = '브라우저 정책으로 자동 재생이 제한됩니다. 다시 시도하세요.';
+            });
+        } catch (error) {
+            isMusicPlaying = false;
+            musicPreviewStatus.textContent = '트랙을 재생할 수 없습니다.';
+        }
+    }
+
+    function applyAdminSettingsToCreateRoom() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+
+            const settings = JSON.parse(raw);
+            const pageTitle = document.getElementById('createRoomPageTitle');
+            const submitBtn = document.getElementById('createRoomSubmitBtn');
+            const bgOptionModern = document.getElementById('bgOptionModern');
+            const bgOptionCozy = document.getElementById('bgOptionCozy');
+            const bgOptionParty = document.getElementById('bgOptionParty');
+            const bgOptionSunset = document.getElementById('bgOptionSunset');
+            const bgOptionForest = document.getElementById('bgOptionForest');
+            const bgOptionCity = document.getElementById('bgOptionCity');
+
+            if (typeof settings.createRoomPageTitle === 'string' && settings.createRoomPageTitle.trim()) {
+                const nextTitle = settings.createRoomPageTitle.trim();
+                pageTitle.textContent = nextTitle;
+                document.title = `MealMate - ${nextTitle}`;
+            }
+
+            if (typeof settings.createRoomSubmitText === 'string' && settings.createRoomSubmitText.trim()) {
+                submitBtn.textContent = settings.createRoomSubmitText.trim();
+            }
+
+            if (typeof settings.createRoomBgModern === 'string' && settings.createRoomBgModern.trim()) {
+                bgOptionModern.style.backgroundImage = `url('${settings.createRoomBgModern.trim()}')`;
+            }
+
+            if (typeof settings.createRoomBgCozy === 'string' && settings.createRoomBgCozy.trim()) {
+                bgOptionCozy.style.backgroundImage = `url('${settings.createRoomBgCozy.trim()}')`;
+            }
+
+            if (typeof settings.createRoomBgParty === 'string' && settings.createRoomBgParty.trim()) {
+                bgOptionParty.style.backgroundImage = `url('${settings.createRoomBgParty.trim()}')`;
+            }
+
+            if (typeof settings.createRoomBgSunset === 'string' && settings.createRoomBgSunset.trim()) {
+                bgOptionSunset.style.backgroundImage = `url('${settings.createRoomBgSunset.trim()}')`;
+            }
+
+            if (typeof settings.createRoomBgForest === 'string' && settings.createRoomBgForest.trim()) {
+                bgOptionForest.style.backgroundImage = `url('${settings.createRoomBgForest.trim()}')`;
+            }
+
+            if (typeof settings.createRoomBgCity === 'string' && settings.createRoomBgCity.trim()) {
+                bgOptionCity.style.backgroundImage = `url('${settings.createRoomBgCity.trim()}')`;
+            }
+
+            musicTrackMap.jazz = typeof settings.createRoomMusicJazz === 'string' ? settings.createRoomMusicJazz.trim() : '';
+            musicTrackMap.pop = typeof settings.createRoomMusicPop === 'string' ? settings.createRoomMusicPop.trim() : '';
+            musicTrackMap.acoustic = typeof settings.createRoomMusicAcoustic === 'string' ? settings.createRoomMusicAcoustic.trim() : '';
+            musicTrackMap.quiet = typeof settings.createRoomMusicQuiet === 'string' ? settings.createRoomMusicQuiet.trim() : '';
+        } catch (error) {
+            console.warn('create-room 설정 로드 실패', error);
+        }
+    }
+
+    // 배경 선택 로직
+    const bgOptions = document.querySelectorAll('.bg-option');
+    bgOptions.forEach(opt => {
+        opt.onclick = function() {
+            bgOptions.forEach(o => o.classList.remove('active'));
+            this.classList.add('active');
+            selectedBg = this.dataset.bg;
+        };
+    });
+
+    // 음악 선택 로직
+    const musicChips = document.querySelectorAll('.music-chip');
+    musicChips.forEach(chip => {
+        chip.onclick = function() {
+            const nextMusicKey = this.dataset.musicKey || 'jazz';
+            const isSameChip = selectedMusicKey === nextMusicKey;
+
+            if (isSameChip && musicPreviewAudio && !musicPreviewAudio.paused) {
+                stopMusicPreview();
+                musicPreviewStatus.textContent = '정지됨';
+                return;
+            }
+
+            musicChips.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            selectedMusicKey = nextMusicKey;
+            selectedMusic = this.innerText.replace('🎵 ', '');
+            playSelectedMusicPreview();
+        };
+    });
+
+    function createRoom() {
+        const title = document.getElementById('roomTitle').value;
+        if(!title) return alert('제목을 입력해주세요!');
+        const people = Math.min(8, Math.max(2, Number(document.getElementById('peopleCount').value) || 2));
+
+        const roomData = {
+            id: Date.now(),
+            title: title,
+            bgTheme: selectedBg,
+            music: selectedMusic,
+            musicTrack: musicTrackMap[selectedMusicKey] || '',
+            people: String(people),
+            host: localStorage.getItem('userName') || '익명'
+        };
+
+        // 로컬 스토리지 저장
+        let rooms = JSON.parse(localStorage.getItem('mealmateRooms') || '[]');
+        rooms.unshift(roomData);
+        localStorage.setItem('mealmateRooms', JSON.stringify(rooms));
+        localStorage.setItem('mealmateCurrentRoomId', String(roomData.id));
+        localStorage.setItem('mealmateCurrentRoomPeople', String(people));
+
+        alert(`'${selectedMusic}' 음악과 함께 방이 생성되었습니다!`);
+        location.href = 'main.html';
+    }
+
+    applyAdminSettingsToCreateRoom();
+
+    window.addEventListener('storage', (event) => {
+        if (event.key === STORAGE_KEY) {
+            applyAdminSettingsToCreateRoom();
+        }
+    });
+
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'admin-settings-updated') {
+            applyAdminSettingsToCreateRoom();
+        }
+    });
+</script>
+</body>
+</html>

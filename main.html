@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모두 막방 - K-푸드 라이브</title>
+    <style>
+        :root {
+            --bg-dark: #ffffff;
+            --card-dark: #1e1e1e;
+            --primary: #ff4757;
+            --text-main: #000000;
+            --text-sub: #000000;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            margin: 0;
+            background-color: #eef1f5;
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 430px;
+            background-color: var(--bg-dark);
+            min-height: 100dvh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
+            padding-bottom: 80px;
+        }
+
+        /* 상단 네비게이션 */
+        .header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        /* 로고 클릭 시 관리자 페이지 이동 스타일 */
+        .logo { font-size: 1.4rem; font-weight: 800; color: var(--text-main); cursor: pointer; }
+        .header-icons { display: flex; gap: 15px; font-size: 1.2rem; align-items: center; }
+
+        /* 라이브 스토리 섹션 */
+        .stories {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .story-item { text-align: center; flex-shrink: 0; }
+        .story-circle {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            padding: 2px;
+            margin-bottom: 5px;
+        }
+        .story-circle img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .story-name { font-size: 0.7rem; color: var(--text-sub); }
+
+        /* 메인 배너 */
+        .main-banner {
+            position: relative;
+            margin: 10px 20px;
+            border-radius: 20px;
+            overflow: hidden;
+            height: 250px;
+        }
+        .banner-img { width: 100%; height: 100%; object-fit: cover; opacity: 1; }
+        .banner-info {
+            position: absolute; bottom: 20px; left: 20px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .live-tag {
+            background: var(--primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: inline-block;
+        }
+
+        /* 피드 그리드 */
+        .feed-section { padding: 20px; }
+        .section-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .feed-card { background: var(--card-dark); border-radius: 12px; overflow: hidden; }
+        .feed-card.clickable { cursor: pointer; }
+        .feed-card img { width: 100%; height: 150px; object-fit: cover; }
+        .feed-info { padding: 10px; }
+        .feed-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; color: #fff; }
+        .feed-meta { font-size: 0.7rem; color: #fff; display: flex; justify-content: space-between; }
+
+        /* 하단 탭바 */
+        .bottom-nav {
+            position: fixed; bottom: 0; width: 100%; max-width: 430px;
+            height: 70px; background: #1a1a1a;
+            display: flex; justify-content: space-around; align-items: center;
+            border-top: 1px solid #333;
+        }
+        .bottom-nav .nav-item { text-align: center; font-size: 1.2rem; color: #ffffff; cursor: pointer; }
+        .bottom-nav .nav-item.active { color: #ffffff; }
+        .nav-label { font-size: 0.6rem; margin-top: 4px; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header class="header">
+        <div class="logo" id="mainLogo" onclick="location.href='index.html'">모두 막방</div>
+        <div class="header-icons">
+            <span>🔍</span>
+            <span>🔔</span>
+            <img id="myAvatar" src="https://www.w3schools.com/howto/img_avatar.png" style="width:28px; height:28px; border-radius:50%; cursor:pointer;" onclick="location.href='mypage.html'">
+        </div>
+    </header>
+
+    <div class="stories" id="storiesContainer">
+        <div class="story-item">
+            <div class="story-circle"><img src="https://i.pravatar.cc/150?u=1"></div>
+            <div class="story-name">민지</div>
+        </div>
+        <div class="story-item">
+            <div class="story-circle"><img src="https://i.pravatar.cc/150?u=2"></div>
+            <div class="story-name">수현</div>
+        </div>
+        <div class="story-item">
+            <div class="story-circle"><img src="https://i.pravatar.cc/150?u=3"></div>
+            <div class="story-name">지아</div>
+        </div>
+        <div class="story-item">
+            <div class="story-circle"><img src="https://i.pravatar.cc/150?u=4"></div>
+            <div class="story-name">예린</div>
+        </div>
+    </div>
+
+    <div class="main-banner">
+        <img class="banner-img" id="mainBannerImage" src="https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?q=80&w=1000">
+        <div class="banner-info">
+            <span class="live-tag">실시간 LIVE</span>
+            <h2 id="mainBannerTitle" style="margin:5px 0;">미녀와 함께하는 비빔밥 파티</h2>
+            <p id="mainBannerSub" style="margin:0; font-size:0.8rem; color:#000;">시청자 1,240명 대기 중</p>
+        </div>
+    </div>
+
+    <div class="feed-section">
+        <div class="section-title">🔥 인기 K-푸드 챌린지</div>
+        <div class="grid" id="roomGrid">
+            <div class="feed-card">
+                <img src="https://images.unsplash.com/photo-1498654896293-37aacf113fd9?q=80&w=500">
+                <div class="feed-info">
+                    <div class="feed-title">매운 떡볶이 5단계 도전!</div>
+                    <div class="feed-meta"><span>조회수 1.2만</span><span>3시간 전</span></div>
+                </div>
+            </div>
+            <div class="feed-card">
+                <img src="https://images.unsplash.com/photo-1585032226651-759b368d7246?q=80&w=500">
+                <div class="feed-info">
+                    <div class="feed-title">집에서 만드는 언양 불고기</div>
+                    <div class="feed-meta"><span>조회수 8.5천</span><span>5시간 전</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active">🏠<span class="nav-label">홈</span></div>
+        <div class="nav-item">📺<span class="nav-label">라이브</span></div>
+        <div class="nav-item" id="plusButton" style="font-size: 2rem; color: var(--primary);">+</div>
+        <div class="nav-item">❤️<span class="nav-label">찜</span></div>
+        <div class="nav-item" id="myPageButton" onclick="location.href='mypage.html'">👤<span class="nav-label">마이</span></div>
+    </nav>
+</div>
+
+<script>
+    const STORAGE_KEY = 'mealmate-admin-settings-v1';
+    const ROOMS_KEY = 'mealmateRooms';
+    const DEFAULT_ROOM_IMAGES = {
+        modern: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600',
+        cozy: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600',
+        party: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=600',
+        sunset: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=600',
+        forest: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=600',
+        city: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=600',
+    };
+    const roomGrid = document.getElementById('roomGrid');
+    const defaultRoomGridHtml = roomGrid ? roomGrid.innerHTML : '';
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getThemeImage(bgTheme, settings) {
+        if (bgTheme === 'modern' && settings?.createRoomBgModern) return settings.createRoomBgModern;
+        if (bgTheme === 'cozy' && settings?.createRoomBgCozy) return settings.createRoomBgCozy;
+        if (bgTheme === 'party' && settings?.createRoomBgParty) return settings.createRoomBgParty;
+        if (bgTheme === 'sunset' && settings?.createRoomBgSunset) return settings.createRoomBgSunset;
+        if (bgTheme === 'forest' && settings?.createRoomBgForest) return settings.createRoomBgForest;
+        if (bgTheme === 'city' && settings?.createRoomBgCity) return settings.createRoomBgCity;
+        return DEFAULT_ROOM_IMAGES[bgTheme] || DEFAULT_ROOM_IMAGES.modern;
+    }
+
+    function renderRoomsToFeed() {
+        if (!roomGrid) return;
+
+        let rooms = [];
+        let settings = null;
+
+        try {
+            const roomsRaw = localStorage.getItem(ROOMS_KEY);
+            const parsedRooms = JSON.parse(roomsRaw || '[]');
+            rooms = Array.isArray(parsedRooms) ? parsedRooms : [];
+        } catch (e) {
+            rooms = [];
+        }
+
+        try {
+            const settingsRaw = localStorage.getItem(STORAGE_KEY);
+            settings = settingsRaw ? JSON.parse(settingsRaw) : null;
+        } catch (e) {
+            settings = null;
+        }
+
+        if (!rooms.length) {
+            roomGrid.innerHTML = defaultRoomGridHtml;
+            return;
+        }
+
+        roomGrid.innerHTML = rooms.slice(0, 6).map((room) => {
+            const image = getThemeImage(room.bgTheme, settings);
+            const title = escapeHtml(room.title || '새로운 모임');
+            const host = escapeHtml(room.host || '익명');
+            const music = escapeHtml(room.music || '음악 미지정');
+            const people = escapeHtml(room.people || room.maxPeople || '-');
+            const roomQuery = new URLSearchParams({
+                roomId: String(room.id || ''),
+                title: room.title || '새로운 모임',
+                host: room.host || '익명',
+                bgTheme: room.bgTheme || 'modern',
+                music: room.music || '',
+                musicTrack: room.musicTrack || '',
+                people: String(room.people || room.maxPeople || 2),
+            }).toString();
+            const roomUrl = `room.html?${roomQuery}`;
+
+            return `
+                <a class="feed-card clickable" href="${roomUrl}" style="text-decoration:none; color:inherit; display:block;">
+                    <img src="${image}" alt="${title}">
+                    <div class="feed-info">
+                        <div class="feed-title">${title}</div>
+                        <div class="feed-meta"><span>${host} · ${people}명</span><span>${music}</span></div>
+                    </div>
+                </a>
+            `;
+        }).join('');
+    }
+
+    // 1. 관리자 설정을 화면에 적용하는 함수
+    function applyAdminSettingsToMain() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const settings = JSON.parse(raw);
+
+            const mainLogo = document.getElementById('mainLogo');
+            const mainBannerTitle = document.getElementById('mainBannerTitle');
+            const mainBannerSub = document.getElementById('mainBannerSub');
+            const mainBannerImage = document.getElementById('mainBannerImage');
+
+            if (settings.mainLogo) mainLogo.textContent = settings.mainLogo;
+            if (settings.mainBannerTitle) mainBannerTitle.textContent = settings.mainBannerTitle;
+            if (settings.mainBannerSub) mainBannerSub.textContent = settings.mainBannerSub;
+            if (settings.mainBannerImage) mainBannerImage.src = settings.mainBannerImage;
+        } catch (e) { console.warn('설정 로드 실패', e); }
+    }
+
+    // 2. 로그인 유저 정보를 프로필 아이콘에 적용
+    function applyUserInfo() {
+        const userPicture = localStorage.getItem('userPicture');
+        if (userPicture) {
+            document.getElementById('myAvatar').src = userPicture;
+        }
+    }
+
+    // 3. 새 라이브 방 추가 함수
+    function addUserToLive(name, picture) {
+        const storiesContainer = document.getElementById('storiesContainer');
+        const newStory = `
+            <div class="story-item" onclick="location.href='room.html?host=${encodeURIComponent(name)}'" style="cursor:pointer;">
+                <div class="story-circle">
+                    <img src="${picture || 'https://www.w3schools.com/howto/img_avatar.png'}" alt="${name}">
+                </div>
+                <div class="story-name">${name}</div>
+            </div>
+        `;
+        storiesContainer.insertAdjacentHTML('afterbegin', newStory);
+    }
+
+    // 초기 실행 및 이벤트 리스너
+    window.onload = () => {
+        applyAdminSettingsToMain();
+        applyUserInfo();
+        renderRoomsToFeed();
+
+        // [+] 버튼 클릭 이벤트
+        document.getElementById('plusButton').onclick = () => {
+            const userName = localStorage.getItem('userName');
+            const userPicture = localStorage.getItem('userPicture');
+            
+            if(!userName) {
+                alert("로그인이 필요합니다.");
+                return;
+            }
+
+            const roomTitle = prompt("어떤 먹방을 시작할까요?", userName + "님의 라이브");
+            if(roomTitle) {
+                alert("방이 생성되었습니다!");
+                addUserToLive(userName, userPicture);
+            }
+        };
+
+        document.getElementById('myPageButton').onclick = () => {
+            location.href = 'mypage.html';
+        };
+    };
+
+    // 실시간 설정 변경 감지
+    window.addEventListener('storage', (event) => {
+        if (event.key === STORAGE_KEY) {
+            applyAdminSettingsToMain();
+            renderRoomsToFeed();
+        }
+        if (event.key === ROOMS_KEY) {
+            renderRoomsToFeed();
+        }
+    });
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'admin-settings-updated') {
+            applyAdminSettingsToMain();
+            renderRoomsToFeed();
+        }
+    });
+</script>
+
+</body>
+</html>
